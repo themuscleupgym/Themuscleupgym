@@ -1,1 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MuscleUP — Trainer</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0b2545"/>
+  <style>body{font-family:system-ui;margin:0;background:#f4f7fb} header{background:#0b2545;color:#fff;padding:1rem} .wrap{max-width:1000px;margin:1rem auto;padding:1rem;background:white;border-radius:8px} label{display:block;margin-top:.6rem} input,select,button,textarea{width:100%;padding:.5rem;border:1px solid #d1d7e0;border-radius:6px}</style>
+</head>
+<body>
+  <header><h1>MuscleUP — Trainer Dashboard</h1></header>
+  <main class="wrap">
+    <div id="authArea">
+      <label>Username</label><input id="username"/>
+      <label>Password</label><input id="pw" type="password"/>
+      <button id="signIn">Sign in</button>
+    </div>
 
+    <section id="trainerArea" style="display:none">
+      <h2 id="trainerName">Trainer</h2>
+
+      <h3>Assigned Branch</h3>
+      <div id="branchInfo"></div>
+
+      <h3>Customers (code-only view)</h3>
+      <div id="customerList"></div>
+
+      <h3>Add new customer</h3>
+      <label>Full name</label><input id="newFullName"/>
+      <label>Phone</label><input id="newPhone"/>
+      <label>Assign branch</label><input id="newBranch" placeholder="branch name"/>
+      <label>Initial password</label><input id="newPass" placeholder="password"/>
+      <button id="createCustomer">Create customer</button>
+
+      <div style="margin-top:1rem"><button id="signOut">Sign out</button></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCI8MBk2m5M9smbjiKwMb3_TDAD-x_eIys",
+      authDomain: "muscleup-cfcdd.firebaseapp.com",
+      projectId: "muscleup-cfcdd",
+      storageBucket: "muscleup-cfcdd.firebasestorage.app",
+      messagingSenderId: "164105980592",
+      appId: "1:164105980592:web:0675b84e9b9e349d48c975",
+      measurementId: "G-HVRMZFH1JC"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function sha256(message) {
+      const enc = new TextEncoder();
+      const data = enc.encode(message);
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    async function findUserByUsername(username) {
+      const idx = doc(db, 'users_by_username', username);
+      const idxSnap = await getDoc(idx);
+      if (idxSnap.exists()) {
+        const path = idxSnap.data().userRef;
+        const userSnap = await getDoc(doc(db, ...path.split('/')));
+        return userSnap.exists() ? { id: userSnap.id, data: userSnap.data() } : null;
+      }
+      const q = query(collection(db, 'users'), where('username','==',username));
+      const res = await getDocs(q);
+      if (!res.empty) return { id: res.docs[0].id, data: res.docs[0].data() };
+      return null;
+    }
+
+    let currentTrainer = null;
+
+    document.getElementById('signIn').addEventListener('click', async () => {
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('pw').value;
+      if (!u || !p) return alert('enter credentials');
+      const found = await findUserByUsername(u);
+      if (!found) return alert('not found');
+      if (found.data.role !== 'trainer') return alert('not a trainer');
+      const h = await sha256(p);
+      if (h !== found.data.passwordHash) return alert('bad password');
+      currentTrainer = { id: found.id, data: found.data };
+      sessionStorage.setItem('muscleup_user', JSON.stringify({ id: found.id, role: 'trainer' }));
+      showTrainerArea();
+    });
+
+    async function showTrainerArea() {
+      document.getElementById('authArea').style.display = 'none';
+      document.getElementById('trainerArea').style.display = '';
+      document.getElementById('trainerName').textContent = `Trainer: ${currentTrainer.data.fullName || currentTrainer.data.username}`;
+      document.getElementById('branchInfo').textContent = `Branch: ${currentTrainer.data.branch || 'not assigned'}`;
+      await loadCustomersForBranch(currentTrainer.data.branch);
+    }
+
+    async function loadCustomersForBranch(branch) {
+      if (!branch) {
+        document.getElementById('customerList').innerHTML = 'No branch assigned';
+        return;
+      }
+      const q = query(collection(db, 'users'), where('branch','==', branch), where('role','==','customer'));
+      const docs = await getDocs(q);
+      // trainers see only codes + membership period + expire date, no name/phone
+      const listHtml = docs.docs.map(d=>{
+        const ddata = d.data();
+        const mem = ddata.membership || {};
+        const expires = mem.expiresAt ? new Date(mem.expiresAt).toLocaleDateString() : 'N/A';
+        return `<div style="padding:.4rem;border-bottom:1px solid #eee"><b>Code:</b> ${ddata.code} — Expires: ${expires} — Joined: ${ddata.joinedAt || 'N/A'}</div>`;
+      }).join('') || 'No customers';
+      document.getElementById('customerList').innerHTML = listHtml;
+    }
+
+    // Create customer (trainer action) — trainer supplies full details and password
+    async function generateUniqueCode(fullName) {
+      const prefix = (fullName.trim().slice(0,2) || 'XX').toUpperCase();
+      // Try random 4-digit numbers until unique
+      for (let i=0;i<50;i++) {
+        const n = Math.floor(1000 + Math.random()*9000);
+        const code = `${prefix}${n}`;
+        // check uniqueness
+        const q = query(collection(db, 'users'), where('code','==',code));
+        const res = await getDocs(q);
+        if (res.empty) return code;
+      }
+      throw new Error('Unable to create unique code, try again');
+    }
+
+    document.getElementById('createCustomer').addEventListener('click', async () => {
+      const fullName = document.getElementById('newFullName').value.trim();
+      const phone = document.getElementById('newPhone').value.trim();
+      const branch = document.getElementById('newBranch').value.trim() || currentTrainer.data.branch;
+      const pass = document.getElementById('newPass').value || Math.random().toString(36).slice(-6);
+      if (!fullName || !phone) return alert('name & phone required');
+      const code = await generateUniqueCode(fullName);
+      const pwHash = await sha256(pass);
+      const userDoc = await addDoc(collection(db, 'users'), {
+        username: code.toLowerCase(), // trainer can't see name so username set to code
+        passwordHash: pwHash,
+        role: 'customer',
+        fullName,
+        phone,
+        branch,
+        code,
+        createdBy: currentTrainer.id,
+        joinedAt: new Date().toISOString(),
+        membership: { startDate: new Date().toISOString(), fee: 0, paidAmount: 0, expiresAt: null }
+      });
+      // index by username and code for quick lookup
+      await setDoc(doc(db, 'users_by_username', code.toLowerCase()), { userRef: userDoc.path });
+      await setDoc(doc(db, 'users_by_code', code), { userRef: userDoc.path });
+      alert(`Customer created. Code: ${code} — initial password: ${pass}`);
+      await loadCustomersForBranch(branch);
+    });
+
+    document.getElementById('signOut').addEventListener('click', ()=>{ sessionStorage.removeItem('muscleup_user'); location.href='index.html'; });
+
+    // handle existing session
+    const s = sessionStorage.getItem('muscleup_user');
+    if (s) {
+      const ss = JSON.parse(s);
+      if (ss.role === 'trainer') {
+        const snap = await getDoc(doc(db, 'users', ss.id));
+        if (snap.exists()) { currentTrainer = { id: snap.id, data: snap.data() }; showTrainerArea(); }
+      }
+    }
+
+    // Register service worker
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(console.error);
+  </script>
+</body>
+</html>
