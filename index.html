@@ -1,72 +1,18 @@
-<!doctype html>
+<!-- index.html -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>MuscleUP — Login</title>
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0b2545"/>
-  <style>
-    /* Minimal clean styling */
-    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:0;background:#f4f7fb;color:#111}
-    header{background:#0b2545;color:white;padding:1rem;text-align:center}
-    .wrap{max-width:900px;margin:2rem auto;padding:1rem;background:white;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
-    fieldset{border:0;margin:0;padding:0}
-    label{display:block;margin:0.5rem 0 0.2rem}
-    input,select,button,textarea{width:100%;padding:.6rem;border:1px solid #d1d7e0;border-radius:6px}
-    .row{display:flex;gap:1rem}
-    .row > *{flex:1}
-    .actions{display:flex;gap:1rem;margin-top:1rem}
-    .small{font-size:.9rem;color:#666}
-    .links{display:flex;gap:1rem;justify-content:space-between;margin-top:1rem}
-    .btn{background:#0b2545;color:white;border:0;padding:.6rem;border-radius:6px;cursor:pointer}
-  </style>
-</head>
-<body>
-  <header><h1>MuscleUP</h1><div class="small">Secure gym management — sign in</div></header>
-  <main class="wrap">
-    <h2>Sign in</h2>
-    <p class="small">Choose your role and sign in. Customers use <strong>code</strong> + password (format: First two letters of name uppercase + 4-digit unique number, e.g. MA1003).</p>
-
-    <form id="loginForm">
-      <label for="role">Role</label>
-      <select id="role">
-        <option value="customer">Customer</option>
-        <option value="trainer">Trainer</option>
-        <option value="owner">Owner</option>
-      </select>
-
-      <label for="username">Username / Code</label>
-      <input id="username" required placeholder="customer code or username (owner/trainer)" />
-
-      <label for="password">Password</label>
-      <input id="password" type="password" required placeholder="password" />
-
-      <div class="actions">
-        <button type="submit" class="btn">Sign in</button>
-        <button type="button" id="registerBtn">Register (trainer/owner only)</button>
-      </div>
-      <div class="links">
-        <div id="status" class="small"></div>
-        <a href="user.html" id="guestLink" class="small" style="display:none">Open user area (for testing)</a>
-      </div>
-    </form>
-
-    <hr/>
-    <h3>Quick notes</h3>
-    <ul>
-      <li>Owner default: <code>username: mukesh</code> / <code>password: 1234</code>. Full name: Mukesh Jakhad.</li>
-      <li>Data stored in Firebase Firestore & Storage (config inline in script).</li>
-    </ul>
-  </main>
-
+  <meta charset="UTF-8">
+  <title>MuscleUP Gym - Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- PWA manifest and icons -->
+  <link rel="manifest" href="/Themuscleupgym/manifest.webmanifest">
+  <!-- Firebase App (the core Firebase SDK) -->
   <script type="module">
-    // Firebase imports (modular)
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-    import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
-
-    // Firebase config (user provided)
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+    import { getFirestore } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+    // Your web app's Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyCI8MBk2m5M9smbjiKwMb3_TDAD-x_eIys",
       authDomain: "muscleup-cfcdd.firebaseapp.com",
@@ -77,99 +23,35 @@
       measurementId: "G-HVRMZFH1JC"
     };
     const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
     const db = getFirestore(app);
-    const storage = getStorage(app);
-
-    // Utility: sha256 hash password string
-    async function sha256(message) {
-      const enc = new TextEncoder();
-      const data = enc.encode(message);
-      const hash = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
-    }
-
-    // Create owner account if missing
-    async function ensureOwner() {
-      const ownerDoc = doc(db, 'users', 'owner_mukesh');
-      const snap = await getDoc(ownerDoc);
-      if (!snap.exists()) {
-        const pwHash = await sha256('1234');
-        await setDoc(ownerDoc, {
-          username: 'mukesh',
-          passwordHash: pwHash,
-          fullName: 'Mukesh Jakhad',
-          role: 'owner',
-          createdAt: new Date().toISOString()
-        });
-        // replicate to a username-indexed doc for lookup
-        await setDoc(doc(db, 'users_by_username', 'mukesh'), { userRef: ownerDoc.path });
-        console.log('Created owner default account (mukesh / 1234).');
+    // Example login handler
+    async function login() {
+      const username = document.getElementById('loginUser').value;
+      const password = document.getElementById('loginPass').value;
+      try {
+        // You may use signInWithEmailAndPassword if using email,
+        // or a custom verification if using codes as user names.
+        await signInWithEmailAndPassword(auth, username + '@muscleup.com', password);
+        // Determine role (owner/trainer/customer) and redirect
+        if (username === 'mukesh') {
+          window.location.href = 'owner.html';
+        } else {
+          // Fetch user role from Firestore or auth claims, then redirect accordingly.
+          // e.g., if role=='trainer', go to trainer.html
+          // if role=='customer', go to user.html
+        }
+      } catch (error) {
+        alert('Login failed: ' + error.message);
       }
-    }
-
-    // Lookup user by username (fast path: users_by_username index)
-    async function findUserByUsername(username) {
-      // first search users_by_username collection
-      const idxDoc = doc(db, 'users_by_username', username);
-      const idxSnap = await getDoc(idxDoc);
-      if (idxSnap.exists()) {
-        const userPath = idxSnap.data().userRef;
-        const userSnap = await getDoc(doc(db, ...userPath.split('/')));
-        return userSnap.exists() ? { id: userSnap.id, data: userSnap.data() } : null;
-      }
-      // fallback: query users collection for username
-      const q = query(collection(db, 'users'), where('username', '==', username));
-      const res = await getDocs(q);
-      if (!res.empty) {
-        const d = res.docs[0];
-        return { id: d.id, data: d.data() };
-      }
-      return null;
-    }
-
-    // Session helpers
-    function startSession(userId, userData) {
-      sessionStorage.setItem('muscleup_user', JSON.stringify({ id:userId, role:userData.role }));
-    }
-
-    document.addEventListener('DOMContentLoaded', async () => {
-      await ensureOwner(); // ensure owner exists
-
-      const form = document.getElementById('loginForm');
-      const roleSelect = document.getElementById('role');
-      const status = document.getElementById('status');
-      const registerBtn = document.getElementById('registerBtn');
-
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        status.textContent = 'Signing in...';
-        const role = roleSelect.value;
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
-        if (!username || !password) { status.textContent = 'Missing'; return; }
-        const user = await findUserByUsername(username);
-        if (!user) { status.textContent = 'User not found'; return; }
-        if (user.data.role !== role) { status.textContent = `Role mismatch`; return; }
-        const hash = await sha256(password);
-        if (hash !== user.data.passwordHash) { status.textContent = 'Invalid password'; return; }
-        if (user.data.blocked) { status.textContent = 'Account blocked. Contact owner.'; return; }
-        startSession(user.id, user.data);
-        status.textContent = 'Signed in — redirecting...';
-        // redirect to role page
-        if (role === 'owner') location.href = 'owner.html';
-        else if (role === 'trainer') location.href = 'trainer.html';
-        else location.href = 'user.html';
-      });
-
-      registerBtn.addEventListener('click', () => {
-        alert('Registration: trainers and owners are managed by owner. Trainers must be created by owner. For quick testing, owner credentials already set.');
-      });
-    });
-
-    // Register service worker for PWA
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(console.error);
     }
   </script>
+</head>
+<body>
+  <h1>Welcome to MuscleUP Gym</h1>
+  <input id="loginUser" type="text" placeholder="Username or Code">
+  <input id="loginPass" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <!-- Add links for password reset, etc. as needed -->
 </body>
 </html>
