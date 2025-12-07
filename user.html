@@ -1,231 +1,74 @@
-<!doctype html>
+<!-- user.html -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>MuscleUP — Customer</title>
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0b2545"/>
-  <style>/* minimal layout */ body{font-family:system-ui;margin:0;background:#f4f7fb;color:#111} header{background:#0b2545;color:#fff;padding:1rem} .wrap{max-width:1000px;margin:1rem auto;padding:1rem;background:white;border-radius:8px} label{display:block;margin-top:.6rem} input,textarea,button{width:100%;padding:.5rem;border:1px solid #d1d7e0;border-radius:6px} .row{display:flex;gap:1rem} .row> *{flex:1}</style>
+  <meta charset="UTF-8">
+  <title>MuscleUP Gym - Member Dashboard</title>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+    import { getFirestore, doc, getDoc, updateDoc, collection, addDoc } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+    const firebaseConfig = {/* same config as above */};
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    onAuthStateChanged(auth, async user => {
+      if (!user) {
+        window.location.href = 'index.html';  // not logged in
+      } else {
+        const uid = user.uid;
+        // Fetch user profile
+        const docRef = doc(db, 'users', uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          // Populate profile fields
+          document.getElementById('profileName').innerText = data.name;
+          document.getElementById('profileStart').innerText = data.startDate;
+          document.getElementById('profileEnd').innerText = data.endDate;
+          // etc.
+        }
+      }
+    });
+    // Functions to record workout, attendance, etc.
+    async function addWorkout() {
+      const exercise = document.getElementById('newWorkout').value;
+      await addDoc(collection(db, 'users', auth.currentUser.uid, 'workouts'), {
+        date: new Date().toLocaleDateString(), exercise
+      });
+      alert('Workout logged!');
+    }
+    async function markAttendance() {
+      await addDoc(collection(db, 'users', auth.currentUser.uid, 'attendance'), {
+        date: new Date().toLocaleDateString()
+      });
+      alert('Attendance recorded!');
+    }
+  </script>
 </head>
 <body>
-  <header><h1>MuscleUP — Customer Dashboard</h1></header>
-  <main class="wrap">
-    <div id="loginArea">
-      <p class="small">If you signed in from index, you will be redirected automatically. Otherwise sign in here with your <strong>code</strong> + password.</p>
-      <label>Code</label><input id="code" placeholder="e.g. MA1003"/>
-      <label>Password</label><input id="pw" type="password"/>
-      <button id="signinBtn">Sign in</button>
-    </div>
-
-    <section id="dashboard" style="display:none">
-      <h2 id="greet">Welcome</h2>
-      <div id="profile">
-        <label>Profile picture</label>
-        <img id="pfp" src="" alt="profile" style="width:120px;height:120px;border-radius:8px;object-fit:cover"/>
-        <input type="file" id="pfpUpload"/>
-        <button id="uploadPfpBtn">Upload picture</button>
-      </div>
-
-      <h3>Membership</h3>
-      <div id="membership"></div>
-
-      <h3>Attendance</h3>
-      <button id="markAttend">Mark Today Attendance</button>
-      <div id="attendanceList"></div>
-
-      <h3>Workouts</h3>
-      <label>Add workout (text)</label>
-      <textarea id="workoutText" rows="3"></textarea>
-      <button id="addWorkout">Add workout</button>
-      <div id="workoutList"></div>
-
-      <h3>Payments</h3>
-      <div id="payments"></div>
-      <label>Pay via UPI</label>
-      <input id="upi_id" placeholder="upi@bank (owner preset)"/>
-      <button id="payBtn">Open UPI app</button>
-      <label>After paying, upload screenshot</label>
-      <input type="file" id="paymentScreenshot"/>
-      <button id="uploadPaymentProof">Upload proof</button>
-
-      <div style="margin-top:1rem">
-        <button id="signoutBtn">Sign out</button>
-      </div>
-    </section>
-  </main>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc, collection, addDoc, where, query, getDocs, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-    import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCI8MBk2m5M9smbjiKwMb3_TDAD-x_eIys",
-      authDomain: "muscleup-cfcdd.firebaseapp.com",
-      projectId: "muscleup-cfcdd",
-      storageBucket: "muscleup-cfcdd.firebasestorage.app",
-      messagingSenderId: "164105980592",
-      appId: "1:164105980592:web:0675b84e9b9e349d48c975",
-      measurementId: "G-HVRMZFH1JC"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const storage = getStorage(app);
-
-    async function sha256(message) {
-      const enc = new TextEncoder();
-      const data = enc.encode(message);
-      const hash = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
-    }
-
-    function show(el) { el.style.display = ''; }
-    function hide(el) { el.style.display = 'none'; }
-
-    const loginArea = document.getElementById('loginArea');
-    const dashboard = document.getElementById('dashboard');
-
-    // Session-check: if index set sessionStorage, use it
-    const session = sessionStorage.getItem('muscleup_user');
-    if (session) {
-      const s = JSON.parse(session);
-      if (s.role === 'customer') {
-        awaitLoadCustomer(s.id);
-      } else {
-        // redirect to proper area if wrong role
-        if (s.role === 'trainer') location.href = 'trainer.html';
-        if (s.role === 'owner') location.href = 'owner.html';
-      }
-    }
-
-    async function awaitLoadCustomer(customerId) {
-      hide(loginArea);
-      show(dashboard);
-      loadCustomer(customerId);
-    }
-
-    async function loadCustomerByCode(code, pw) {
-      // find user by code
-      const q = query(collection(db, 'users'), where('code', '==', code));
-      const docs = await getDocs(q);
-      if (docs.empty) { alert('Code not found'); return null; }
-      const d = docs.docs[0];
-      const data = d.data();
-      const hash = await sha256(pw);
-      if (hash !== data.passwordHash) { alert('Invalid password'); return null; }
-      if (data.blocked) { alert('Account blocked'); return null; }
-      // store session
-      sessionStorage.setItem('muscleup_user', JSON.stringify({ id:d.id, role:data.role }));
-      return { id: d.id, data };
-    }
-
-    async function loadCustomer(id) {
-      const userDoc = doc(db, 'users', id);
-      const snap = await getDoc(userDoc);
-      if (!snap.exists()) { alert('User missing'); return; }
-      const u = snap.data();
-      document.getElementById('greet').textContent = `Hi ${u.fullName || u.code}`;
-      // profile pic if exists
-      if (u.photoURL) document.getElementById('pfp').src = u.photoURL;
-
-      // membership
-      const mem = u.membership || {};
-      let memHtml = `Joined: ${u.joinedAt || 'N/A'}<br/>Fee paid: ${mem.paidAmount || 0}<br/>Package: ${mem.fee || 'N/A'}`;
-      if (mem.expiresAt) {
-        const expires = new Date(mem.expiresAt);
-        const now = new Date();
-        const daysLeft = Math.ceil((expires - now)/(1000*60*60*24));
-        memHtml += `<br/>Expires: ${expires.toLocaleDateString()} (${daysLeft} days left)`;
-        if (daysLeft <= 0) memHtml += `<br/><b style="color:red">Membership expired — please pay</b>`;
-      }
-      document.getElementById('membership').innerHTML = memHtml;
-
-      // attendance list
-      const aQ = query(collection(db, 'attendance'), where('userId','==', id));
-      const aDocs = await getDocs(aQ);
-      const attendEl = document.getElementById('attendanceList');
-      attendEl.innerHTML = aDocs.docs.map(d=>`<div>${d.data().date}</div>`).join('') || 'No attendance yet';
-
-      // workouts list
-      const wQ = query(collection(db, 'workouts'), where('userId','==', id));
-      const wDocs = await getDocs(wQ);
-      document.getElementById('workoutList').innerHTML = wDocs.docs.map(d=>`<div><b>${new Date(d.data().ts).toLocaleDateString()}</b>: ${d.data().text}</div>`).join('') || 'No workouts yet';
-    }
-
-    document.getElementById('signinBtn').addEventListener('click', async () => {
-      const code = document.getElementById('code').value.trim();
-      const pw = document.getElementById('pw').value;
-      if (!code || !pw) return alert('code & password required');
-      const r = await loadCustomerByCode(code, pw);
-      if (r) {
-        await loadCustomer(r.id);
-        hide(loginArea);
-        show(dashboard);
-      }
-    });
-
-    // Upload profile picture
-    document.getElementById('uploadPfpBtn').addEventListener('click', async () => {
-      const f = document.getElementById('pfpUpload').files[0];
-      if (!f) return alert('Choose file');
-      const sessionObj = JSON.parse(sessionStorage.getItem('muscleup_user') || '{}');
-      if (!sessionObj.id) return alert('Sign in first');
-      const storageRef = sref(storage, `profilePics/${sessionObj.id}`);
-      await uploadBytes(storageRef, f);
-      const url = await getDownloadURL(storageRef);
-      await setDoc(doc(db, 'users', sessionObj.id), { photoURL: url }, { merge: true });
-      document.getElementById('pfp').src = url;
-      alert('Profile picture updated');
-    });
-
-    // Mark attendance
-    document.getElementById('markAttend').addEventListener('click', async () => {
-      const sessionObj = JSON.parse(sessionStorage.getItem('muscleup_user') || '{}');
-      if (!sessionObj.id) return alert('Sign in first');
-      await addDoc(collection(db, 'attendance'), { userId: sessionObj.id, date: new Date().toLocaleDateString(), ts: Date.now() });
-      alert('Attendance recorded');
-      await loadCustomer(sessionObj.id);
-    });
-
-    // Add workout
-    document.getElementById('addWorkout').addEventListener('click', async () => {
-      const txt = document.getElementById('workoutText').value.trim();
-      if (!txt) return alert('Add text');
-      const sessionObj = JSON.parse(sessionStorage.getItem('muscleup_user') || '{}');
-      if (!sessionObj.id) return alert('Sign in first');
-      await addDoc(collection(db, 'workouts'), { userId: sessionObj.id, text: txt, ts: Date.now() });
-      document.getElementById('workoutText').value = '';
-      alert('Workout saved');
-      await loadCustomer(sessionObj.id);
-    });
-
-    // Pay: open UPI scheme (mobile)
-    document.getElementById('payBtn').addEventListener('click', () => {
-      const upi = document.getElementById('upi_id').value.trim();
-      if (!upi) return alert('Enter UPI id provided by owner');
-      const payUrl = `upi://pay?pa=${encodeURIComponent(upi)}&pn=${encodeURIComponent('MuscleUP Gym')}&am=1&cu=INR`;
-      location.href = payUrl; // mobile will open UPI app
-    });
-
-    // Upload payment proof
-    document.getElementById('uploadPaymentProof').addEventListener('click', async () => {
-      const f = document.getElementById('paymentScreenshot').files[0];
-      if (!f) return alert('Choose file');
-      const sessionObj = JSON.parse(sessionStorage.getItem('muscleup_user') || '{}');
-      if (!sessionObj.id) return alert('Sign in first');
-      const paymentDoc = await addDoc(collection(db, 'payments'), { userId: sessionObj.id, createdAt: serverTimestamp(), status:'pending' });
-      const storageRef = sref(storage, `payments/${paymentDoc.id}`);
-      await uploadBytes(storageRef, f);
-      const url = await getDownloadURL(storageRef);
-      await setDoc(doc(db, 'payments', paymentDoc.id), { userId: sessionObj.id, createdAt: serverTimestamp(), status:'pending', screenshotURL: url }, { merge: true });
-      alert('Payment proof uploaded. Owner will verify and update account.');
-    });
-
-    document.getElementById('signoutBtn').addEventListener('click', () => { sessionStorage.removeItem('muscleup_user'); location.href = 'index.html'; });
-
-    // Register service worker
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(console.error);
-  </script>
+  <h2>Member Dashboard</h2>
+  <div id="profileSection">
+    <p>Name: <span id="profileName"></span></p>
+    <p>Member Since: <span id="profileStart"></span></p>
+    <p>Expires On: <span id="profileEnd"></span></p>
+    <!-- More profile info -->
+  </div>
+  <div id="paymentsSection">
+    <button onclick="window.location.href='upi-payment-link'">Pay Now (UPI)</button>
+    <p>Upload payment screenshot:</p>
+    <input type="file" id="paymentScreenshot" accept="image/*">
+    <button onclick="uploadPayment()">Submit</button>
+  </div>
+  <div id="workoutSection">
+    <h3>Record a Workout</h3>
+    <input id="newWorkout" type="text" placeholder="Describe workout">
+    <button onclick="addWorkout()">Add Workout</button>
+  </div>
+  <div id="attendanceSection">
+    <h3>Attendance</h3>
+    <button onclick="markAttendance()">Mark Present Today</button>
+  </div>
+  <!-- List of past workouts and attendance (could be populated via JS) -->
 </body>
 </html>
