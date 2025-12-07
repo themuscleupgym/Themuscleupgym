@@ -1,23 +1,14 @@
 {
   "name": "MuscleUP Gym",
   "short_name": "MuscleUP",
-  "description": "Official PWA app for MuscleUP Gym for Owners, Trainers, and Customers.",
+  "description": "PWA app for MuscleUP Gym",
   "start_url": "/Themuscleupgym/index.html",
   "scope": "/Themuscleupgym/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "theme_color": "#1976d2",
   "icons": [
-    {
-      "src": "/Themuscleupgym/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/Themuscleupgym/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "/Themuscleupgym/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/Themuscleupgym/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
