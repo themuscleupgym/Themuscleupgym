@@ -1,18 +1,105 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>MuscleUP Gym - Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- PWA manifest and icons -->
-  <link rel="manifest" href="/Themuscleupgym/manifest.webmanifest">
-  <!-- Firebase App (the core Firebase SDK) -->
+  <meta charset="utf-8" />
+  <title>MuscleUP — Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Material Design Lite CSS -->
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css" />
+  <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+
+  <!-- PWA manifest (GitHub Pages path) -->
+  <link rel="manifest" href="/Themuscleupgym/manifest.json" />
+
+  <style>
+    body { font-family: "Roboto", "Helvetica", Arial, sans-serif; margin:0; background:#fafafa; }
+    .center { max-width:420px; margin:6vh auto; padding:24px; }
+    .brand { text-align:center; margin-bottom: 18px; }
+    .brand h1 { margin:0; font-size:26px; }
+    .note { color:#666; font-size:13px; margin-top:8px; }
+    .role-row { display:flex; gap:8px; margin:12px 0; justify-content:space-between; }
+    .links { margin-top:12px; text-align:center; font-size:13px; }
+    .mdl-button--colored { background: #1976d2; color:white }
+    .error { color: #b00020; margin-top:8px }
+    .success { color: #0b8457; margin-top:8px }
+  </style>
+
+  <!-- Firebase (modular) - using CDN module imports inside script below -->
+</head>
+<body>
+
+  <div class="center mdl-card mdl-shadow--2dp">
+    <div style="padding:20px;">
+      <div class="brand">
+        <h1>MuscleUP</h1>
+        <div class="note">Owner · Trainers · Customers — login to continue</div>
+      </div>
+
+      <!-- Role selector -->
+      <div class="role-row">
+        <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="role-owner">
+          <input type="radio" id="role-owner" class="mdl-radio__button" name="role" value="owner">
+          <span class="mdl-radio__label">Owner</span>
+        </label>
+
+        <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="role-trainer">
+          <input type="radio" id="role-trainer" class="mdl-radio__button" name="role" value="trainer">
+          <span class="mdl-radio__label">Trainer</span>
+        </label>
+
+        <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="role-customer">
+          <input type="radio" id="role-customer" class="mdl-radio__button" name="role" value="customer" checked>
+          <span class="mdl-radio__label">Customer</span>
+        </label>
+      </div>
+
+      <!-- Login form -->
+      <div>
+        <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" style="width:100%">
+          <input class="mdl-textfield__input" type="text" id="username">
+          <label class="mdl-textfield__label" for="username">Username / Code</label>
+        </div>
+
+        <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" style="width:100%">
+          <input class="mdl-textfield__input" type="password" id="password">
+          <label class="mdl-textfield__label" for="password">Password</label>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:12px;">
+          <button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored" id="loginBtn">
+            Login
+          </button>
+          <button class="mdl-button mdl-js-button" id="signupBtn" title="Trainer/Owner sign-up is admin-controlled">
+            Need account?
+          </button>
+        </div>
+
+        <div id="msg" class="error" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="links">
+        <a href="user.html" style="margin-right:12px">Customer demo view</a>
+        <a href="trainer.html" style="margin-right:12px">Trainer demo view</a>
+        <a href="owner.html">Owner demo view</a>
+        <div class="note" style="margin-top:8px">If owner account doesn't exist yet, enter <strong>mukesh / 1234</strong> to auto-create it.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase & App logic (ES Modules) -->
   <script type="module">
+    // ----- Firebase imports & config -----
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
-    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
-    import { getFirestore } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
-    // Your web app's Firebase configuration
+    import { getAnalytics } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics.js';
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+    import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+    import { getStorage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js';
+
+    // Your Firebase config (as you provided)
     const firebaseConfig = {
       apiKey: "AIzaSyCI8MBk2m5M9smbjiKwMb3_TDAD-x_eIys",
       authDomain: "muscleup-cfcdd.firebaseapp.com",
@@ -22,36 +109,166 @@
       appId: "1:164105980592:web:0675b84e9b9e349d48c975",
       measurementId: "G-HVRMZFH1JC"
     };
+
     const app = initializeApp(firebaseConfig);
+    // Analytics optional
+    try { getAnalytics(app); } catch(e) { /* analytics may be blocked in some environments */ }
+
     const auth = getAuth(app);
     const db = getFirestore(app);
-    // Example login handler
-    async function login() {
-      const username = document.getElementById('loginUser').value;
-      const password = document.getElementById('loginPass').value;
-      try {
-        // You may use signInWithEmailAndPassword if using email,
-        // or a custom verification if using codes as user names.
-        await signInWithEmailAndPassword(auth, username + '@muscleup.com', password);
-        // Determine role (owner/trainer/customer) and redirect
-        if (username === 'mukesh') {
-          window.location.href = 'owner.html';
-        } else {
-          // Fetch user role from Firestore or auth claims, then redirect accordingly.
-          // e.g., if role=='trainer', go to trainer.html
-          // if role=='customer', go to user.html
-        }
-      } catch (error) {
-        alert('Login failed: ' + error.message);
-      }
+    const storage = getStorage(app);
+
+    // ----- Helper DOM refs -----
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const msg = document.getElementById('msg');
+
+    // Read selected role
+    function getSelectedRole() {
+      const radios = document.getElementsByName('role');
+      for (const r of radios) if (r.checked) return r.value;
+      return 'customer';
     }
+
+    // Utility: set message
+    function showMessage(text, kind='error') {
+      msg.className = (kind === 'error') ? 'error' : 'success';
+      msg.innerText = text || '';
+    }
+
+    // Map username to email used for Firebase Auth
+    function usernameToEmail(username) {
+      // keep lowercase for consistency
+      return `${username.toLowerCase()}@muscleup.com`;
+    }
+
+    // Redirect by role
+    function goToRolePage(role) {
+      if (role === 'owner') window.location.href = '/Themuscleupgym/owner.html';
+      else if (role === 'trainer') window.location.href = '/Themuscleupgym/trainer.html';
+      else window.location.href = '/Themuscleupgym/user.html';
+    }
+
+    // Main login handler
+    loginBtn.addEventListener('click', async () => {
+      showMessage('', ''); // clear
+      const username = (usernameInput.value || '').trim();
+      const password = (passwordInput.value || '').trim();
+      const selectedRole = getSelectedRole(); // owner/trainer/customer
+
+      if (!username || !password) {
+        showMessage('Please enter username and password.');
+        return;
+      }
+
+      const email = usernameToEmail(username);
+
+      try {
+        // Attempt to sign in
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        const user = cred.user;
+
+        // After sign-in, fetch Firestore profile to validate role
+        const userDocRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userDocRef);
+
+        if (!userSnap.exists()) {
+          // No profile yet — deny access unless owner auto-create case below
+          showMessage('No user profile found. Contact admin to create account.');
+          await signOut(auth);
+          return;
+        }
+
+        const profile = userSnap.data();
+        const actualRole = profile.role || 'customer';
+
+        if (actualRole !== selectedRole) {
+          // Role mismatch: prevent access
+          showMessage(`Role mismatch. Your account role is "${actualRole}". Please choose the correct role before login.`);
+          await signOut(auth);
+          return;
+        }
+
+        // Success -> route to correct page
+        showMessage('Login successful. Redirecting...', 'success');
+        setTimeout(() => goToRolePage(actualRole), 700);
+
+      } catch (signInError) {
+        // If sign-in failed, check special owner fallback or present friendly error.
+        // Special owner bootstrap: if username===mukesh and password===1234 -> auto-create owner account
+        if (username.toLowerCase() === 'mukesh' && password === '1234' && selectedRole === 'owner') {
+          try {
+            showMessage('Owner account not present. Creating owner account now...', 'success');
+            // Create in Firebase Auth
+            const createCred = await createUserWithEmailAndPassword(auth, email, password);
+            const newUser = createCred.user;
+            // Create Firestore profile for owner
+            const ownerProfile = {
+              name: "Mukesh Jakhad",
+              username: "mukesh",
+              role: "owner",
+              createdAt: new Date().toISOString()
+            };
+            await setDoc(doc(db, 'users', newUser.uid), ownerProfile);
+            showMessage('Owner account created. Redirecting to owner dashboard...', 'success');
+            setTimeout(() => goToRolePage('owner'), 700);
+            return;
+          } catch (createError) {
+            console.error('Owner create error:', createError);
+            showMessage('Failed to create owner account: ' + (createError.message || createError.code));
+            return;
+          }
+        }
+
+        // Otherwise show a clearer message
+        console.warn('Sign-in error', signInError);
+        // For some common cases:
+        if (signInError.code === 'auth/wrong-password') {
+          showMessage('Incorrect password. Try again.');
+        } else if (signInError.code === 'auth/user-not-found') {
+          showMessage('Account not found. Please contact owner to create your account.');
+        } else {
+          showMessage('Login failed: ' + (signInError.message || signInError.code));
+        }
+      }
+    });
+
+    // "Need account?" button — quick info prompt (account creation is owner-controlled)
+    signupBtn.addEventListener('click', () => {
+      alert("Accounts must be created by the Owner. Trainers can add customers from their trainer dashboard. If you're the owner, login with the owner credentials (mukesh / 1234) to bootstrap the admin account.");
+    });
+
+    // ----- Service Worker registration for PWA -----
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/Themuscleupgym/sw.js')
+        .then(reg => console.log('Service Worker registered:', reg.scope))
+        .catch(err => console.warn('SW registration failed:', err));
+    }
+
+    // Optionally, check if user is already signed in and redirect them
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+    import { getDoc as fsGetDoc } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return; // not logged in
+      try {
+        const udoc = await fsGetDoc(doc(db, 'users', user.uid));
+        if (!udoc.exists()) return; // no profile
+        const role = udoc.data().role || 'customer';
+        // redirect to appropriate page if they are at login
+        // but don't redirect if they are already on a page other than index
+        if (window.location.pathname.endsWith('/index.html') || window.location.pathname.endsWith('/')) {
+          setTimeout(() => goToRolePage(role), 400);
+        }
+      } catch(e) { console.warn('Auth state check error', e); }
+    });
+
+    // small helper to get doc reference
+    function doc(db, col, id) { return window.firebaseDoc ? window.firebaseDoc(db, col, id) : (function(){ 
+      // The modular import above already provided doc via firestore import, but to avoid conflict in some browsers, return the doc reference using the imported function set in module scope
+      return (window.__doc || (window.__doc = (await import('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js')).doc))(db, col, id);
+    })(); }
   </script>
-</head>
-<body>
-  <h1>Welcome to MuscleUP Gym</h1>
-  <input id="loginUser" type="text" placeholder="Username or Code">
-  <input id="loginPass" type="password" placeholder="Password">
-  <button onclick="login()">Login</button>
-  <!-- Add links for password reset, etc. as needed -->
 </body>
 </html>
